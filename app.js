@@ -398,22 +398,39 @@ app.post("/api/payment-callback", handlePaymentCallback);
 
 // Replace app.listen with httpServer.listen
 
-const https = require("https");
-const fs = require("fs");
+// const https = require("https");
+// const fs = require("fs");
 // const express = require('express');
 // const app = express();
 
-const options = {
-  key: fs.readFileSync("/path/to/privkey.pem"),
-  cert: fs.readFileSync("/path/to/fullchain.pem"),
-};
+// const options = {
+//   key: fs.readFileSync("/path/to/privkey.pem"),
+//   cert: fs.readFileSync("/path/to/fullchain.pem"),
+// };
 
+// app.get("/", (req, res) => {
+//   res.send("Hello, HTTPS!");
+// });
+
+// https.createServer(options, app).listen(4500, () => {
+//   console.log("HTTPS Server running on port 4500");
+// });
+
+//httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// const express = require("express");
+// const app = express();
+
+// Example routes
 app.get("/", (req, res) => {
-  res.send("Hello, HTTPS!");
+  res.send("Hello, your server is running via HTTPS!");
 });
 
-https.createServer(options, app).listen(4500, () => {
-  console.log("HTTPS Server running on port 4500");
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working!" });
 });
 
-// httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Listen on localhost:4500
+app.listen(4500, "127.0.0.1", () => {
+  console.log("HTTP Server running on http://127.0.0.1:4500");
+});
