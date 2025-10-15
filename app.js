@@ -1,5 +1,6 @@
 const express = require("express");
 const connectDB = require("./config/dbConnection.js");
+
 const userRoutes = require("./routes/userRoutes.js");
 const categoryRoutes = require("./routes/categoryRoutes.js");
 const blogRoutes = require("./routes/blogRoutes.js");
@@ -25,6 +26,8 @@ const astrologerRequestRoutes = require("./routes/astrologerRequestRoutes.js");
 const freeServicesRoutes = require("./routes/FreeServices/freeServicesRoutes.js");
 const astroServicesRoutes = require("./routes/astroServices/astroServicesRoutes.js");
 const audioVidedoCallingRoutes = require("./routes/audioVideoCallingRoute.js");
+const contactMessageRoutes = require("./routes/contactMessage.js");
+
 const cors = require("cors");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
@@ -85,6 +88,7 @@ app.use("/api/chats", chatRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/enquiry", enquiryRouter);
 app.use("/api/audiovideo", audioVidedoCallingRoutes);
+app.use("/api/contact", contactMessageRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
