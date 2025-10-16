@@ -16,7 +16,7 @@ async function sendAdmissionMail(admission) {
       <h2 style="text-align:center; color:#1a73e8;">🎓 New Admission Application</h2>
       <p><strong>Program:</strong> ${admission.program}</p>
       <p><strong>Duration:</strong> ${admission.duration}</p>
-      <p><strong>Fee:</strong> ${admission.fee}</p>
+      <p><strong>Fee:</strong> ₹${admission.fee}</p>
       <hr>
       <h3>Student Details</h3>
       <p><strong>Full Name:</strong> ${admission.fullName}</p>
@@ -40,18 +40,48 @@ async function sendAdmissionMail(admission) {
 }
 
 exports.createAdmission = async (data) => {
-  let { fullName, email, mobileNumber, courseSelection } = data;
-  if (!fullName || !email || !mobileNumber || !courseSelection) {
+  let {
+    fullName,
+    email,
+    mobileNumber,
+    courseSelection,
+    program,
+    duration,
+    fee,
+  } = data;
+  if (
+    !fullName ||
+    !email ||
+    !mobileNumber ||
+    !courseSelection ||
+    !program ||
+    !duration ||
+    !fee
+  ) {
     throwError(422, "please fill all required fields");
   }
   fullName = fullName?.toLowerCase();
   email = email?.toLowerCase();
   courseSelection = courseSelection?.toLowerCase();
+  program = program?.toLowerCase();
+  if (fee !== undefined && fee !== null) {
+    fee = parseInt(fee, 10);
+    if (isNaN(fee) || fee <= 0)
+      throw new Error("Fee must be a valid positive number");
+  }
+  if (duration !== undefined && duration !== null) {
+    duration = parseInt(duration, 10);
+    if (isNaN(duration) || duration <= 0)
+      throw new Error("Duration must be a valid positive number");
+  }
   const admissionData = {
     fullName: fullName,
     email: email,
     courseSelection: courseSelection,
     mobileNumber: mobileNumber,
+    program: program,
+    duration: duration,
+    fee: fee,
   };
   const admission = await Admission.create(admissionData);
   await sendAdmissionMail(admission);
@@ -61,6 +91,7 @@ exports.createAdmission = async (data) => {
 exports.getAllAdmissions = async (query) => {
   let {
     search,
+    program,
     courseSelection,
     page = 1,
     limit = 10,
@@ -69,6 +100,7 @@ exports.getAllAdmissions = async (query) => {
   } = query;
   const filter = {};
   if (courseSelection) filter.courseSelection = courseSelection;
+  if (program) filter.program = program;
   if (search) {
     filter.$or = [
       { fullName: { $regex: search, $options: "i" } },

@@ -12,10 +12,11 @@ const admissionSchema = new mongoose.Schema(
     },
     program: {
       type: String,
-      default: "Graduation's Program in Ancient Sciences",
+      required: true,
+      enum: ["graduation", "master", "phd"],
     },
-    duration: { type: String, default: "1 Year" },
-    fee: { type: String, default: "₹10,000" },
+    duration: { type: Number, required: true },
+    fee: { type: Number, required: true },
     status: {
       type: String,
       enum: ["new", "in-review", "approved", "rejected"],
