@@ -7,7 +7,11 @@ exports.createMessage = async (req, res) => {
     return sendSuccess(res, 201, "Message sent successfully", result);
   } catch (err) {
     console.error("Error creating message:", err);
-    return sendError(res, 500, err.message || "Internal Server Error");
+    return sendError(
+      res,
+      err.statusCode || 500,
+      err.message || "Internal Server Error"
+    );
   }
 };
 
@@ -29,7 +33,11 @@ exports.getAllMessages = async (req, res) => {
     return sendSuccess(res, 200, "Messages fetched successfully", result);
   } catch (err) {
     console.error("Error fetching messages:", err);
-    return sendError(res, 500, err.message || "Internal Server Error");
+    return sendError(
+      res,
+      err.statusCode || 500,
+      err.message || "Internal Server Error"
+    );
   }
 };
 
@@ -38,7 +46,11 @@ exports.getMessageById = async (req, res) => {
     const result = await contactService.getMessageById(req.params.id);
     return sendSuccess(res, 200, "Message fetched successfully", result);
   } catch (err) {
-    return sendError(res, 500, err.message || "Internal Server Error");
+    return sendError(
+      res,
+      err.statusCode || 500,
+      err.message || "Internal Server Error"
+    );
   }
 };
 
@@ -47,7 +59,11 @@ exports.updateMessage = async (req, res) => {
     const result = await contactService.updateMessage(req.params.id, req.body);
     return sendSuccess(res, 200, "Message updated successfully", result);
   } catch (err) {
-    return sendError(res, 500, err.message || "Internal Server Error");
+    return sendError(
+      res,
+      err.statusCode || 500,
+      err.message || "Internal Server Error"
+    );
   }
 };
 
@@ -56,6 +72,10 @@ exports.deleteMessage = async (req, res) => {
     await contactService.deleteMessage(req.params.id);
     return sendSuccess(res, 200, "Message deleted successfully");
   } catch (err) {
-    return sendError(res, 500, err.message || "Internal Server Error");
+    return sendError(
+      res,
+      err.statusCode || 500,
+      err.message || "Internal Server Error"
+    );
   }
 };

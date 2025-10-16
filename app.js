@@ -27,6 +27,7 @@ const freeServicesRoutes = require("./routes/FreeServices/freeServicesRoutes.js"
 const astroServicesRoutes = require("./routes/astroServices/astroServicesRoutes.js");
 const audioVidedoCallingRoutes = require("./routes/audioVideoCallingRoute.js");
 const contactMessageRoutes = require("./routes/contactMessage.js");
+const admissionRoutes = require("./routes/admission.js");
 
 const cors = require("cors");
 const { createServer } = require("http");
@@ -89,6 +90,7 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/enquiry", enquiryRouter);
 app.use("/api/audiovideo", audioVidedoCallingRoutes);
 app.use("/api/contact", contactMessageRoutes);
+app.use("/api/admission", admissionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
