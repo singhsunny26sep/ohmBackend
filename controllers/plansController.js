@@ -1,18 +1,16 @@
-// planController.js
 const Plan = require("../models/plansModel");
 const userModel = require("../models/userModel");
 
 exports.createPlan = async (req, res) => {
   try {
-    const { name, price, questions, includesRemedies } = req.body;
-
-    const newPlan = new Plan({ name, price, questions, includesRemedies });
-    await newPlan.save();
-
-    res.status(201).json({
-      success: true,
-      data: newPlan,
+    const { name, price, noOfQuestions, includesRemedies } = req.body;
+    const newPlan = await Plan.create({
+      name,
+      price,
+      noOfQuestions,
+      includesRemedies,
     });
+    res.status(201).json({ success: true, data: newPlan });
   } catch (error) {
     console.error("Error creating plan:", error);
     res.status(500).json({
@@ -24,49 +22,45 @@ exports.createPlan = async (req, res) => {
 
 exports.buyPlan = async (req, res) => {
   try {
-    const { planId } = req.body;
-    const userId = req.user._id; // Assumes `protect` middleware attaches `req.user`
-
-    // Validate the provided plan ID
+    const { planId } = req.params;
+    const userId = req.user._id;
     const plan = await Plan.findById(planId);
     if (!plan) {
-      return res.status(404).json({ success: false, message: "Plan not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Plan not found." });
     }
-
-    console.log("plan: ", plan);
-
-
-    // Fetch the user
     const user = await userModel.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
-
-    // Calculate the new plan's start and end dates
-    const startDate = new Date();
-    const endDate = new Date(startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000); // Add duration in days
-
-    // Update the user's active plan
-    user.activePlan = {
-      planId: plan._id,
-      startDate: startDate,
-      endDate: endDate,
-      remainingMessages: plan.maxMessages || 0,
-      remainingSize: plan.maxMessageSize || 0,
-    };
-
+    // const startDate = new Date();
+    // const endDate = new Date(
+    //   startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000
+    // );
+    user.activePlanId = plan._id;
+    user.isPlanActive = true;
+    //   startDate: startDate,
+    //   endDate: endDate,
+    //   remainingMessages: plan.maxMessages || 0,
+    //   remainingSize: plan.maxMessageSize || 0,
+    // };
     await user.save();
-
-    res.status(200).json({ success: true, message: `You have successfully purchased the plan: ${plan.name}.`, activePlan: user.activePlan, });
+    res.status(200).json({
+      success: true,
+      message: `You have successfully purchased the plan: ${plan.name}.`,
+      //  activePlan: plan,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
-// planController.js
 exports.getAllPlans = async (req, res) => {
   try {
-    const plans = await Plan.find().sort({ price: 1 }); // Sorting by price ascending
+    const plans = await Plan.find().sort({ price: 1 });
     res.status(200).json({
       success: true,
       data: plans,
@@ -80,21 +74,16 @@ exports.getAllPlans = async (req, res) => {
   }
 };
 
-
-// planController.js
 exports.getPlanById = async (req, res) => {
   const { planId } = req.params;
-
   try {
     const plan = await Plan.findById(planId);
-
     if (!plan) {
       return res.status(404).json({
         success: false,
         message: "Plan not found.",
       });
     }
-
     res.status(200).json({
       success: true,
       data: plan,
@@ -107,25 +96,22 @@ exports.getPlanById = async (req, res) => {
     });
   }
 };
-// planController.js
+
 exports.updatePlan = async (req, res) => {
   const { planId } = req.params;
-  const { name, price, questions, includesRemedies } = req.body;
-
+  const { name, price, noOfQuestions, includesRemedies } = req.body;
   try {
     const updatedPlan = await Plan.findByIdAndUpdate(
       planId,
-      { name, price, questions, includesRemedies },
+      { name, price, noOfQuestions, includesRemedies },
       { new: true }
     );
-
     if (!updatedPlan) {
       return res.status(404).json({
         success: false,
         message: "Plan not found.",
       });
     }
-
     res.status(200).json({
       success: true,
       data: updatedPlan,
@@ -138,20 +124,17 @@ exports.updatePlan = async (req, res) => {
     });
   }
 };
-// planController.js
+
 exports.deletePlan = async (req, res) => {
   const { planId } = req.params;
-
   try {
     const deletedPlan = await Plan.findByIdAndDelete(planId);
-
     if (!deletedPlan) {
       return res.status(404).json({
         success: false,
         message: "Plan not found.",
       });
     }
-
     res.status(200).json({
       success: true,
       message: "Plan deleted successfully.",

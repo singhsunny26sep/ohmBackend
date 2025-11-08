@@ -1,5 +1,18 @@
 const express = require("express");
+const ngrok = require("ngrok");
+const cors = require("cors");
+const morgan = require("morgan");
+const msg91 = require("msg91");
+const { createServer } = require("http");
+const { Server } = require("socket.io");
+const chatModel = require("./models/chatModel.js");
 const connectDB = require("./config/dbConnection.js");
+const userModel = require("./models/userModel.js");
+const sessionModel = require("./models/sessionModel.js");
+require("dotenv").config();
+const PORT = process.env.PORT || 4500;
+const msg91AuthKey = process.env.MSG91_AUTHKEY;
+const app = express();
 
 const userRoutes = require("./routes/userRoutes.js");
 const categoryRoutes = require("./routes/categoryRoutes.js");
@@ -28,41 +41,21 @@ const astroServicesRoutes = require("./routes/astroServices/astroServicesRoutes.
 const audioVidedoCallingRoutes = require("./routes/audioVideoCallingRoute.js");
 const contactMessageRoutes = require("./routes/contactMessage.js");
 const admissionRoutes = require("./routes/admission.js");
-
-const cors = require("cors");
-const { createServer } = require("http");
-const { Server } = require("socket.io");
-const chatModel = require("./models/chatModel.js");
+const enquiryRouter = require("./routes/enquiry.js");
 const {
   protect,
   socketAuthenticator,
 } = require("./middleware/authMiddleware.js");
-const enquiryRouter = require("./routes/enquiry.js");
-const userModel = require("./models/userModel.js");
-const msg91 = require("msg91");
-require("dotenv").config();
-
-const app = express();
 
 const log = require("./utils/logger/logger.js").logger;
-
 const logger = log.getLogger("AppApi");
-
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-  },
-});
-// Connect to database
+const io = new Server(httpServer, { cors: { origin: "*" } });
 connectDB();
-
-// Use CORS middleware
+app.use(morgan("dev"));
 app.use(cors());
-// Middleware
 app.use(express.json());
 
-// Routes
 app.use("/api/blogs", blogRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/categories", categoryRoutes);
@@ -92,21 +85,15 @@ app.use("/api/audiovideo", audioVidedoCallingRoutes);
 app.use("/api/contact", contactMessageRoutes);
 app.use("/api/admission", admissionRoutes);
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ success: false, message: "Something went wrong" });
 });
 
-const PORT = process.env.PORT || 5580;
-console.log("MSG91 object:", msg91);
-console.log("Available methods:", Object.keys(msg91));
-
 app.get("/", async (req, res) => {
   res.send("ASTROLOGY APP");
 });
 
-// Exception Handler Function
 function onError(error) {
   if (error.syscall !== "listen") {
     throw error;
@@ -127,7 +114,6 @@ function onError(error) {
   }
 }
 
-// Function: To confirm Service is listening on the configured Port
 function onListening() {
   const addr = httpServer.address();
   const bind = typeof addr === "string" ? `pipe ${addr}` : `port ${addr.port}`;
@@ -139,21 +125,16 @@ httpServer.on("error", onError);
 httpServer.on("listening", onListening);
 
 app.use(express.urlencoded({ extended: true }));
-
-// Middleware for WebSocket Authentication
 io.use((socket, next) => {
   socketAuthenticator(socket, next);
 });
 
-// Generate room ID
 const generateRoomId = (user1, user2) => {
   return [user1, user2].sort().join("_");
 };
 
-// Endpoint to get or create room
 app.post("/api/getRoomId", protect, (req, res) => {
   const { recipientId } = req.body;
-
   if (!recipientId) {
     return res
       .status(400)
@@ -161,26 +142,19 @@ app.post("/api/getRoomId", protect, (req, res) => {
   }
   const userId = req.user._id;
   const roomId = generateRoomId(userId, recipientId);
-  // console.log("roomId: ", roomId);
-
   res.status(200).json({ success: true, roomId });
 });
 
-// MSG91 Configuration (Fixed for version 0.0.7)
-const msg91AuthKey = process.env.MSG91_AUTHKEY;
-
-// Helper function to send SMS using MSG91
 const sendSMS = (mobile, message) => {
   return new Promise((resolve, reject) => {
     const options = {
       authkey: msg91AuthKey,
       mobiles: mobile,
       message: message,
-      sender: "ASTROW", // Your registered sender ID
-      route: 4, // Transactional route
-      country: 91, // Country code for India
+      sender: "ASTROW",
+      route: 4,
+      country: 91,
     };
-
     msg91.send(options, (error, response) => {
       if (error) {
         console.error("MSG91 Error:", error);
@@ -193,162 +167,154 @@ const sendSMS = (mobile, message) => {
   });
 };
 
-// Helper function to send OTP
 const sendOTP = async (mobile, otp) => {
   const message = `Your OTP for Astrowani is ${otp}. Please do not share this OTP with anyone.`;
   return sendSMS(mobile, message);
 };
 
-// Export functions for use in routes (if needed)
 app.locals.sendSMS = sendSMS;
 app.locals.sendOTP = sendOTP;
 
-// Socket.IO events
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log("✅ User connected:", socket.id);
   let roomID;
-
-  // Join room
+  // ===================== JOIN ROOM =====================
   socket.on("join_room", async (roomId) => {
-    console.log("roomId: ", roomId);
-
-    roomID = roomId;
-    socket.join(roomID);
-    console.log(`Socket ${socket.id} joined users room-id ${roomID}`);
-
-    // Fetch the user's role and details (assuming socket.user is set via authentication middleware)
-    const user = await userModel.findById(socket.user._id);
-    if (user) {
-      if (user.role === "customer" || user.role === "user") {
-        // Send Welcome Message
+    try {
+      if (!roomId) return socket.emit("error", { message: "Room ID missing" });
+      roomID = roomId;
+      socket.join(roomID);
+      console.log(`🟢 ${socket.id} joined room ${roomID}`);
+      const userId = socket?.user?._id;
+      if (!userId) return;
+      const user = await userModel.findById(userId).select("role");
+      if (!user) return;
+      if (["customer", "user"].includes(user.role)) {
         const welcomeMessage = {
-          sender: "System", // Can be replaced with a system bot ID or astrologer's ID
+          sender: "System",
           message:
             "Welcome to Astrowani India! Our expert astrologers are here to guide you through the planets and nakshatras.",
           hindiMessage:
             "ओहम एस्ट्रो में आपका स्वागत है! हमारे विशेषज्ञ ज्योतिषी आपको ग्रहों व नक्षत्रों के माध्यम से मार्गदर्शन करने के लिए तैयार हैं।",
         };
-
         io.to(roomID).emit("receiveMessage", welcomeMessage);
       }
+    } catch (err) {
+      console.error("Error in join_room:", err);
+      socket.emit("error", { message: "Failed to join room" });
     }
   });
-
-  // Handle message
+  // ===================== SEND MESSAGE =====================
   socket.on("sendMessage", async ({ roomId, sessionId, receiver, message }) => {
-    console.log("roomId: ", roomId);
-    console.log("sessionId: ", sessionId);
-    console.log("receiver: ", receiver);
-    console.log("message: ", message);
-
     try {
-      if (!receiver || !message) {
-        return socket.emit("error", { message: "Invalid receiver or message" });
-      }
-
-      // Fetch sender user details (including role and active plan)
+      if (!roomId || !sessionId || !receiver || !message)
+        return socket.emit("error", {
+          message: "Missing required message fields",
+        });
       const sender = await userModel
         .findById(socket.user._id)
-        .populate("activePlan.planId");
-      if (!sender) {
-        return socket.emit("error", { message: "User not found" });
-      }
-
-      // Check if the user is a customer
+        .populate("activePlanId");
+      console.log("Sender details:", sender);
+      if (!sender) return socket.emit("error", { message: "User not found" });
       if (sender.role === "customer") {
-        // Validate active plan
-        if (!sender.activePlan || !sender.activePlan.planId) {
+        if (!sender.isPlanActive || !sender.activePlanId)
           return socket.emit("error", {
             message:
               "No active plan found. Please purchase a plan to initiate chat.",
           });
-        }
-
-        const { remainingMessages } = sender.activePlan;
-
-        // Check if the user has remaining messages
-        if (remainingMessages <= 0) {
-          return socket.emit("error", {
-            message: "Your plan limit is exhausted. Please upgrade your plan.",
-          });
-        }
-
-        // Decrement remaining messages
-        sender.activePlan.remainingMessages -= 1;
-        await sender.save();
       }
-
-      // Save the chat message to the database
-      const chat = new chatModel({
+      const chat = await chatModel.create({
         sessionId,
         sender: socket.user._id,
         receiver,
         message,
       });
-
-      await chat.save();
-
-      // Notify the room of the new message
-      io.to(roomID).emit("receiveMessage", chat);
-
-      // Send Thank You Message ONLY when the session is ending or after a specific number of messages
-      const sessionMessages = await chatModel.countDocuments({ sessionId });
-      if (sessionMessages === 1 || sessionMessages % 5 === 0) {
-        // Example: First message or every 5 messages
+      console.log("Chat message saved:", chat);
+      io.to(roomId).emit("receiveMessage", chat);
+      const messageCount = await chatModel.countDocuments({ sessionId });
+      if (messageCount === 1 || messageCount % 5 === 0) {
         const thankYouMessage = {
-          sender: "System", // Can be replaced with a system bot ID or astrologer's ID
+          sender: "System",
           message:
             "Thank you for trusting us! We hope our astrology services have brought positivity and clarity to your life. Wishing you a brighter future!",
           hindiMessage:
             "हम पर विश्वास करने के लिए धन्यवाद! हमें आशा है कि हमारी ज्योतिष सेवाएं आपके जीवन में सकारात्मकता और स्पष्टता लाएंगी। आपका भविष्य उज्ज्वल हो!",
         };
-
-        io.to(roomID).emit("receiveMessage", thankYouMessage);
+        io.to(roomId).emit("receiveMessage", thankYouMessage);
       }
-    } catch (error) {
-      console.error("Error saving chat message:", error);
+    } catch (err) {
+      console.error("Error in sendMessage:", err);
       socket.emit("error", { message: "Failed to send message" });
     }
   });
-
-  // Disconnect
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+  // ===================== DISCONNECT =====================
+  socket.on("disconnect", async () => {
+    try {
+      const userId = socket?.user?._id;
+      if (!userId) {
+        console.log(`⚪ Unknown user disconnected: ${socket.id}`);
+        return;
+      }
+      const user = await userModel
+        .findById(userId)
+        .select("role isPlanActive activePlanId");
+      if (!user) {
+        console.log(`⚪ Disconnected user not found: ${socket.id}`);
+        return;
+      }
+      if (["customer", "user"].includes(user.role)) {
+        const updates = [];
+        if (user.isPlanActive || user.activePlanId) {
+          updates.push(
+            userModel.findByIdAndUpdate(userId, {
+              $set: { isPlanActive: false, activePlanId: null },
+            })
+          );
+        }
+        updates.push(
+          sessionModel.updateMany(
+            { clientId: userId, status: "ongoing" },
+            { $set: { status: "completed", completedAt: new Date() } }
+          )
+        );
+        await Promise.all(updates);
+        console.log(
+          `🔴 ${user.role} (${userId}) disconnected → Plan deactivated & session(s) completed`
+        );
+      } else {
+        console.log(
+          `🟠 ${user.role} (${userId}) disconnected — no plan/session updates`
+        );
+      }
+    } catch (err) {
+      console.error("❌ Error in disconnect event:", err);
+    }
   });
 });
 
 const handlePaymentCallback = async (req, res) => {
   try {
     const { merchantId, merchantTransactionId, transactionId } = req.body;
-
     console.log("Received payment callback:", req.body);
-
-    // Verify the payment status
     if (merchantId !== process.env.MERCHANT_ID) {
       console.error("Invalid merchant ID:", merchantId);
       return res.status(400).json({ message: "Invalid merchant ID" });
     }
-
     const appointment = await Appointment.findById(merchantTransactionId);
     if (!appointment) {
       console.error("Appointment not found:", merchantTransactionId);
       return res.status(404).json({ message: "Appointment not found" });
     }
-
     const convertedId = `MID${merchantTransactionId}`;
-
-    // Check payment status with PhonePe's status check API
     const checkStatusResponse = await checkPaymentStatus(
       merchantId,
       convertedId,
       appointment.createdBy.mobile
     );
-
     if (checkStatusResponse.success) {
       appointment.paymentStatus = checkStatusResponse.code;
       appointment.transactionId = transactionId;
       await appointment.save();
-
       res.json({ status: appointment.paymentStatus });
     } else {
       console.error("Payment verification failed:", checkStatusResponse);
@@ -367,17 +333,11 @@ const checkPaymentStatus = async (
 ) => {
   const saltKey = process.env.SALT_KEY;
   const saltIndex = process.env.SALT_INDEX;
-
-  // Construct the API endpoint for checking payment status
   const endpoint = `/pg/v1/status/${merchantId}/${merchantTransactionId}`;
-
-  // Correct the string format to match PhonePe's requirement
   const stringToHash = `${endpoint}${saltKey}${mobileNumber}`;
   const sha256 = crypto.createHash("sha256").update(stringToHash).digest("hex");
   const xVerify = `${sha256}###${saltIndex}`;
-
   try {
-    // Make a GET request to the PhonePe API
     const response = await axios.get(
       `https://api-preprod.phonepe.com/apis/pg-sandbox${endpoint}`,
       // `https://api.phonepe.com/apis/hermes/${endpoint}`,
@@ -399,35 +359,8 @@ const checkPaymentStatus = async (
   }
 };
 
-// Define the payment callback route
 app.post("/api/payment-callback", handlePaymentCallback);
 
-// Replace app.listen with httpServer.listen
-
-// const https = require("https");
-// const fs = require("fs");
-// const express = require('express');
-// const app = express();
-
-// const options = {
-//   key: fs.readFileSync("/path/to/privkey.pem"),
-//   cert: fs.readFileSync("/path/to/fullchain.pem"),
-// };
-
-// app.get("/", (req, res) => {
-//   res.send("Hello, HTTPS!");
-// });
-
-// https.createServer(options, app).listen(4500, () => {
-//   console.log("HTTPS Server running on port 4500");
-// });
-
-//httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-// const express = require("express");
-// const app = express();
-
-// Example routes
 app.get("/", (req, res) => {
   res.send("Hello, your server is running via HTTPS!");
 });
@@ -436,7 +369,14 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "API is working!" });
 });
 
-// Listen on localhost:4500
-app.listen(4500, "127.0.0.1", () => {
-  console.log("HTTP Server running on http://127.0.0.1:4500");
+httpServer.listen(PORT, async () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  if (process.env.ENABLE_NGROK === "true") {
+    const url = await ngrok.connect({
+      addr: PORT,
+      authtoken: process.env.NGROK_AUTH_TOKEN,
+      // subdomain: process.env.NGROK_SUBDOMAIN // must be set for custom subdomain
+    });
+    console.log(`Public URL: ${url}`);
+  }
 });
