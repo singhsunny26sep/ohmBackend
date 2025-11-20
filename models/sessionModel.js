@@ -9,7 +9,7 @@ const sessionSchema = new mongoose.Schema(
     },
     astrologerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Astrologer",
+      ref: "User",
       required: true,
     },
     clientId: {
@@ -17,45 +17,30 @@ const sessionSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    startTime: {
-      type: Date,
-      // required: true,
+    planId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Plan",
     },
-    endTime: {
-      type: Date,
-    },
-    duration: {
-      type: Number, // Duration in minutes
-    },
-    chargePerMinute: {
-      type: Number,
-      // required: true, // Astrologer's rate per minute
-    },
-    totalCharge: {
-      type: Number,
-    },
+    startTime: { type: Date },
+    endTime: { type: Date },
+    duration: { type: Number }, // Duration in minutes
+    // chargePerMinute: { type: Number },
+    earnPercentage: { type: Number },
+    totalCharge: { type: Number },
     status: {
       type: String,
       enum: ["completed", "ongoing", "canceled", "missed"],
       default: "ongoing",
     },
-    isPaid: {
-      type: Boolean,
-      default: false,
-    },
-    rating: {
-      type: Number,
-      min: 1,
-      max: 5,
-    },
-    feedback: {
-      type: String,
-    },
-    totalMessages: { type: Number, default: 0 }, // Messages sent in this session
-    totalSize: { type: Number, default: 0 }, // Total data size in KB
-    isPlanExceeded: { type: Boolean, default: false }, // Track if limits are exceeded
+    isPaid: { type: Boolean, default: false },
+    rating: { type: Number, min: 1, max: 5 },
+    feedback: { type: String },
+    totalMessages: { type: Number, default: 0 },
+    // totalSize: { type: Number, default: 0 },
+    isDaySession: { type: Boolean, default: false },
+    // isPlanExceeded: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, versionKey: false }
 );
 
 module.exports = mongoose.model("Session", sessionSchema);

@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
-const { Schema } = mongoose;
+const ObjectId = mongoose.Schema.Types.ObjectId;
 
-const AstrologerSchema = new Schema(
+const AstrologerSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -21,72 +21,28 @@ const AstrologerSchema = new Schema(
       type: String,
       required: [true, "Please provide a phone number"],
     },
-    specialties: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Category",
-        required: true,
-      },
-    ],
+    userId: { type: ObjectId, ref: "User" },
+    specialties: [{ type: ObjectId, ref: "Category", required: true }],
     experience: {
       type: Number,
       required: [true, "Please provide years of experience"],
     },
-    bio: {
-      type: String,
-      // required: [true, "Please provide a short biography"],
-    },
-    experienceAndQualification: {
-      type: String,
-      // required: [true, "Please provide a Experience And Qualification"],
-    },
-    profileImage: {
-      type: String,
-    },
-    isAvailable: {
-      type: Boolean,
-      default: true,
-    },
-    pricing: {
-      type: Number,
-      // required: [true, "Please provide the pricing per consultation"],
-    },
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      // required: true,
-    },
+    bio: { type: String },
+    experienceAndQualification: { type: String },
+    profileImage: { type: String },
+    isAvailable: { type: Boolean, default: true },
+    pricing: { type: Number },
     language: [String],
-    isChatEnabled: {
-      type: Boolean,
-      default: true,
-    },
-    isCallEnabled: {
-      type: Boolean,
-      default: true,
-    },
-    isVideoCallEnabled: {
-      type: Boolean,
-      default: true,
-    },
-    chatChargePerMinute: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    callChargePerMinute: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    callCount: {
-      type: Number,
-      default: 0
-    }
+    dayEarnPercentage: { type: Number, min: 20, max: 80, default: 40 },
+    nightEarnPercentage: { type: Number, min: 20, max: 80, default: 50 },
+    isChatEnabled: { type: Boolean, default: true },
+    isCallEnabled: { type: Boolean, default: true },
+    isVideoCallEnabled: { type: Boolean, default: true },
+    chatChargePerMinute: { type: Number, required: true, default: 0 },
+    callChargePerMinute: { type: Number, required: true, default: 0 },
+    callCount: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true, versionKey: false }
 );
 
-const Astrologer = mongoose.model("Astrologer", AstrologerSchema);
-
-module.exports = Astrologer;
+module.exports = mongoose.model("Astrologer", AstrologerSchema);

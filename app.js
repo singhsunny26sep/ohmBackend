@@ -5,14 +5,16 @@ const morgan = require("morgan");
 const msg91 = require("msg91");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
-const chatModel = require("./models/chatModel.js");
-const connectDB = require("./config/dbConnection.js");
-const userModel = require("./models/userModel.js");
-const sessionModel = require("./models/sessionModel.js");
-require("dotenv").config();
 const PORT = process.env.PORT || 4500;
 const msg91AuthKey = process.env.MSG91_AUTHKEY;
+require("dotenv").config();
 const app = express();
+const connectDB = require("./config/dbConnection.js");
+const Astrologer = require("./models/astrologerModel.js");
+const chatModel = require("./models/chatModel.js");
+const userModel = require("./models/userModel.js");
+const planModel = require("./models/plansModel.js");
+const sessionModel = require("./models/sessionModel.js");
 
 const userRoutes = require("./routes/userRoutes.js");
 const categoryRoutes = require("./routes/categoryRoutes.js");
@@ -46,6 +48,9 @@ const {
   protect,
   socketAuthenticator,
 } = require("./middleware/authMiddleware.js");
+const {
+  calculateSessionCharge,
+} = require("./helpers/calculateSessionCharge.js");
 
 const log = require("./utils/logger/logger.js").logger;
 const logger = log.getLogger("AppApi");
@@ -271,12 +276,72 @@ io.on("connection", (socket) => {
             })
           );
         }
-        updates.push(
-          sessionModel.updateMany(
-            { clientId: userId, status: "ongoing" },
-            { $set: { status: "completed", completedAt: new Date() } }
-          )
-        );
+        let plan;
+        if (user.activePlanId) {
+          plan = await planModel
+            .findById(user.activePlanId)
+            .select("name price");
+        }
+        const sessionUpdate = {
+          status: "completed",
+          endTime: new Date(),
+        };
+        // if (plan && plan.name?.toLowerCase() !== "free") {
+        const activeSessions = await sessionModel.find({
+          clientId: userId,
+          sessionType: "chat",
+          status: "ongoing",
+        });
+        for (const session of activeSessions) {
+          const totalMessages = await chatModel.countDocuments({
+            sessionId: session?._id,
+          });
+          const duration = Math.ceil(
+            (session.endTime - session.startTime) / 60000 // in minutes
+          );
+          const astrologerUser = await userModel.findById(
+            session?.astrologerId
+          );
+          if (!astrologerUser) {
+            return socket.emit("error", {
+              message: "Astrologer user not found",
+            });
+          }
+          const astrologer = await Astrologer.findOne({
+            userId: astrologerUser?._id,
+          });
+          if (!astrologer) {
+            return socket.emit("error", {
+              message: "Astrologer account not found",
+            });
+          }
+          const { dayEarnPercentage, nightEarnPercentage } = astrologer;
+          const { isDay, totalCharge } = calculateSessionCharge(
+            session.startTime,
+            plan.price,
+            dayEarnPercentage,
+            nightEarnPercentage
+          );
+          await sessionModel.findByIdAndUpdate(session._id, {
+            $set: {
+              ...sessionUpdate,
+              isDaySession: isDay,
+              earnPercentage: isDay ? dayEarnPercentage : nightEarnPercentage,
+              totalCharge,
+              totalMessages,
+              duration,
+            },
+          });
+        }
+        // } else {
+        //    const messageCount = await chatModel.countDocuments({ sessionId });
+        //   updates.push(
+        //     sessionModel.updateMany(
+        //       { clientId: userId, status: "ongoing" },
+        //       { $set: sessionUpdate }
+        //     )
+        //   );
+        // }
         await Promise.all(updates);
         console.log(
           `🔴 ${user.role} (${userId}) disconnected → Plan deactivated & session(s) completed`
